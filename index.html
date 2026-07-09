@@ -515,8 +515,7 @@
       <div class="portfolio-item" data-prefix="tech" data-label="Tech"></div>
       <div class="portfolio-item" data-prefix="empresa" data-label="Empresas"></div>
     </div>
-    <p class="hint" style="text-align:center; margin-top:16px;">Pra cada categoria, adicione quantas fotos quiser: <code>images/carimbo-1.jpg</code>, <code>images/carimbo-2.jpg</code>, <code>images/carimbo-3.jpg</code>...</p>
-  </div>
+    </div>
 </section>
 
 <section id="como-funciona">
@@ -534,7 +533,7 @@
       <div class="step">
         <span class="step-num">02</span>
         <h3>Você recebe o preview</h3>
-        <p>Um desenho digital, antes de qualquer impressão.</p>
+        <p>Um desenho digital em minutos, antes de qualquer impressão.</p>
       </div>
       <div class="step">
         <span class="step-num">03</span>
@@ -607,7 +606,7 @@
   // ======================================================
   // CONFIGURAÇÃO — troque pelo seu número real (com DDI+DDD)
   // ======================================================
-  const WHATSAPP_NUMBER = "351211947146"; // ex: 55 + DDD + número, só dígitos
+  const WHATSAPP_NUMBER = "5511999999999"; // ex: 55 + DDD + número, só dígitos
 
   document.getElementById('waFloat').href =
     `https://wa.me/${WHATSAPP_NUMBER}?text=${encodeURIComponent('Oi! Vim pelo site e queria saber mais sobre personalização 3D.')}`;
@@ -625,9 +624,10 @@
   async function buildCarousel(item){
     const prefix = item.dataset.prefix;
     const label = item.dataset.label;
+    const extensions = ['jpg', 'jpeg', 'png', 'webp'];
     const candidates = [];
     for (let n = 1; n <= 6; n++){
-      candidates.push(`images/${prefix}-${n}.jpg`);
+      extensions.forEach(ext => candidates.push(`images/${prefix}-${n}.${ext}`));
     }
     const results = await Promise.all(candidates.map(testImage));
     const valid = results.filter(Boolean);
