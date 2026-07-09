@@ -320,9 +320,23 @@
     font-family: var(--font-mono); font-size: 0.72rem; text-transform:uppercase;
     color: rgba(255,255,255,0.75); letter-spacing:0.05em;
   }
+  .lightbox-caption{
+    margin-top: 14px; color: #fff; font-family: var(--font-body);
+    font-size: 0.95rem; text-align:center; max-width: 90vw;
+  }
+  .lightbox-figure{
+    display:flex; flex-direction:column; align-items:center;
+  }
   .carousel-dots{
-    position:absolute; bottom:10px; left:0; right:0;
+    position:absolute; bottom:38px; left:0; right:0;
     display:flex; justify-content:center; gap:6px; z-index:3;
+  }
+  .slide-caption{
+    position:absolute; left:0; right:0; bottom:0; z-index:2;
+    background: linear-gradient(to top, rgba(20,17,13,0.75), transparent);
+    color:#fff; font-size: 0.74rem; font-weight:500;
+    padding: 20px 10px 8px; text-align:center;
+    pointer-events:none;
   }
   .carousel-dots span{
     width:6px; height:6px; border-radius:50%;
@@ -650,7 +664,10 @@
   <span class="lightbox-chip" id="lightboxChip"></span>
   <button class="lightbox-close" id="lightboxClose" aria-label="Fechar" type="button">&times;</button>
   <button class="lightbox-nav prev" id="lightboxPrev" aria-label="Anterior" type="button">‹</button>
-  <img id="lightboxImg" src="" alt="">
+  <div class="lightbox-figure">
+    <img id="lightboxImg" src="" alt="">
+    <p class="lightbox-caption" id="lightboxCaption"></p>
+  </div>
   <button class="lightbox-nav next" id="lightboxNext" aria-label="Próxima" type="button">›</button>
 </div>
 
@@ -659,10 +676,22 @@
 </a>
 
 <script>
+(async function(){
   // ======================================================
-  // CONFIGURAÇÃO — troque pelo seu número real (com DDI+DDD)
+  // Estes valores vêm do arquivo config.json (na raiz do site).
+  // Se ele não carregar por algum motivo, usa estes valores padrão.
   // ======================================================
-  const WHATSAPP_NUMBER = "5511999999999"; // ex: 55 + DDD + número, só dígitos
+  let WHATSAPP_NUMBER = "351211947146";
+  let CAPTIONS = {};
+
+  try {
+    const res = await fetch('config.json');
+    const cfg = await res.json();
+    if (cfg.whatsapp) WHATSAPP_NUMBER = cfg.whatsapp;
+    if (cfg.captions) CAPTIONS = cfg.captions;
+  } catch (e) {
+    console.warn('Não foi possível carregar config.json — usando valores padrão.', e);
+  }
 
   document.getElementById('waFloat').href =
     `https://wa.me/${WHATSAPP_NUMBER}?text=${encodeURIComponent('Oi! Vim pelo site e queria saber mais sobre personalização 3D.')}`;
@@ -686,8 +715,12 @@
     document.getElementById('lightboxNext').style.display = showNav;
   }
   function updateLightbox(){
-    lightboxImg.src = lbImages[lbIndex];
+    const current = lbImages[lbIndex];
+    lightboxImg.src = current.src;
     lightboxChip.textContent = `${lbLabel} — ${lbIndex + 1}/${lbImages.length}`;
+    const captionEl = document.getElementById('lightboxCaption');
+    captionEl.textContent = CAPTIONS[current.key] || '';
+    captionEl.style.display = CAPTIONS[current.key] ? 'block' : 'none';
   }
   function closeLightbox(){ lightbox.classList.remove('show'); }
 
@@ -736,14 +769,17 @@
     const prefix = item.dataset.prefix;
     const label = item.dataset.label;
     const extensions = ['jpg', 'jpeg', 'png', 'webp'];
-    const candidates = [];
-    for (let n = 1; n <= 6; n++){
-      extensions.forEach(ext => candidates.push(`images/${prefix}-${n}.${ext}`));
-    }
-    const results = await Promise.all(candidates.map(testImage));
-    const valid = results.filter(Boolean);
 
-    if (valid.length === 0){
+    // testa cada número (1 a 6) e guarda o primeiro arquivo válido daquele número
+    const found = [];
+    for (let n = 1; n <= 6; n++){
+      const candidates = extensions.map(ext => `images/${prefix}-${n}.${ext}`);
+      const results = await Promise.all(candidates.map(testImage));
+      const hit = results.find(Boolean);
+      if (hit) found.push({ src: hit, key: `${prefix}-${n}` });
+    }
+
+    if (found.length === 0){
       item.innerHTML = `<div class="portfolio-fallback" style="display:flex;">
         <span>📸 Sua foto aqui</span><span class="chip">${label}</span>
       </div>`;
@@ -751,9 +787,15 @@
     }
 
     let current = 0;
-    const slidesHtml = valid.map(src => `<div class="carousel-slide"><img src="${src}" alt="${label} entregue"></div>`).join('');
-    const dotsHtml = valid.map((_, i) => `<span data-i="${i}" class="${i===0?'active':''}"></span>`).join('');
-    const arrowsHtml = valid.length > 1 ? `
+    const slidesHtml = found.map(f => {
+      const caption = CAPTIONS[f.key] || '';
+      return `<div class="carousel-slide">
+        <img src="${f.src}" alt="${caption || label}">
+        ${caption ? `<p class="slide-caption">${caption}</p>` : ''}
+      </div>`;
+    }).join('');
+    const dotsHtml = found.map((_, i) => `<span data-i="${i}" class="${i===0?'active':''}"></span>`).join('');
+    const arrowsHtml = found.length > 1 ? `
       <button class="carousel-arrow prev" type="button" aria-label="Anterior">‹</button>
       <button class="carousel-arrow next" type="button" aria-label="Próxima">›</button>` : '';
 
@@ -768,7 +810,7 @@
     const dots = item.querySelectorAll('.carousel-dots span');
 
     function goTo(i){
-      current = (i + valid.length) % valid.length;
+      current = (i + found.length) % found.length;
       track.style.transform = `translateX(-${current * 100}%)`;
       dots.forEach((d, idx) => d.classList.toggle('active', idx === current));
     }
@@ -779,14 +821,14 @@
     if (prevBtn) prevBtn.addEventListener('click', () => goTo(current - 1));
     if (nextBtn) nextBtn.addEventListener('click', () => goTo(current + 1));
 
-    if (valid.length > 1){
+    if (found.length > 1){
       let timer = setInterval(() => goTo(current + 1), 4000);
       item.addEventListener('mouseenter', () => clearInterval(timer));
       item.addEventListener('mouseleave', () => { timer = setInterval(() => goTo(current + 1), 4000); });
     }
 
     item.querySelectorAll('.carousel-slide img').forEach((img, i) => {
-      img.addEventListener('click', () => openLightbox(valid, i, label));
+      img.addEventListener('click', () => openLightbox(found, i, label));
     });
   }
 
@@ -853,8 +895,9 @@
     const url = `https://wa.me/${WHATSAPP_NUMBER}?text=${encodeURIComponent(msg)}`;
     window.open(url, '_blank');
   });
+
+})();
 </script>
 
 </body>
 </html>
-
